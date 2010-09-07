@@ -1,0 +1,189 @@
+#!/usr/bin/env python
+
+import os
+import glob
+import fnmatch
+import re
+from optparse import OptionParser
+
+defaultExcludes = ['.git', 'TPLs_src']
+
+def findProject():
+    d = os.getcwd()
+    while d != "/":
+        if os.path.exists(os.path.join(d,".git")):
+            return d
+        d = os.path.dirname(d)
+
+parser = OptionParser(usage="%prog [options] dir")
+parser.add_option("-p", "--project", dest="project",
+                  action="store",help="root project path", default=findProject())
+parser.add_option("-I", "--include", dest="includes",
+                  action="append",help="add an include path", default=[])
+parser.add_option("-x", "--exclude", dest="excludes",
+                  action="append",help="don't look for sources in exclude paths", default=defaultExcludes)
+parser.add_option("-c", "--stdout", dest="stdout",
+                  action="store_true",help="Write output to stdout instead of the new source file")
+
+class Node:
+    def __init__(self,name):
+        self.__name = name
+        self.__outEdges = {}
+        self.__inEdges = {}
+
+    def name(self):
+        return self.__name
+
+    def __str__(self):
+        return self.name()
+
+    def __repr__(self):
+        return self.name()
+
+    def outEdges(self):
+        return self.__outEdges
+
+    def inEdges(self):
+        return self.inEdges
+
+class Edge:
+    def __init__(self,fromNode,toNode):
+        self.__fromNode = fromNode
+        self.__toNode = toNode
+        self.__name = "%s -> %s" % (self.__fromNode, self.__toNode)
+        
+    def name(self):
+        return self.__name
+
+    def __str__(self):
+        return self.name()
+
+    def __repr__(self):
+        return self.name()
+
+    def fromNode(self):
+        return self.__fromNode
+
+    def toNode(self):
+        return self.__toNode;
+
+class Graph:
+    def __init__(self,name):
+        self.__name = name
+        self.__nodes = {}
+        self.__edges = {}
+
+    def name(self):
+        return self.__name
+
+    def __str__(self):
+        return self.name()
+
+    def __repr__(self):
+        return self.name()
+
+    def addNode(self, node):
+        self.__nodes[node.name()] = node
+
+    def addEdge(self, edge):
+        self.addNode(edge.fromNode())
+        self.addNode(edge.toNode())
+        self.__edges[edge.name()] = edge
+
+    def edges(self):
+        return self.__edges.values()
+
+    def nodes(self):
+        return self.__nodes.values()
+        
+def resolve(paths, filename, relpath):
+    for path in paths:
+        absfn = os.path.join(path,filename)
+        if os.path.exists(absfn):
+            print "absfn",absfn
+            #return os.path.relpath(absfn, relpath)
+            return absfn
+    return None
+
+def isSourceFile(f):
+    for pattern in ["*.C", "*.c", "*.c++", "*.cpp", "*.f", "*.F"]:
+        if fnmatch.fnmatchcase(f,pattern):
+            return True
+    return False
+
+def isHeaderFile(f):
+    for pattern in ["*.h", "*.H", "*.h++", "*.hpp"]:
+        if fnmatch.fnmatchcase(f,pattern):
+            return True
+    return False
+
+def excludeDir(topDir, excludes, root):
+    for ex in excludes:
+        if root == os.path.join(topDir,ex):
+            return True
+    return False
+
+def sourceFiles(topDir, excludes):
+    for root, dirnames, filenames in os.walk(topDir,topdown=True):
+        if excludeDir(topDir, excludes, root):
+            while len(dirnames): del dirnames[0]
+            continue
+        for f in filenames:
+            relfn = os.path.join(root,f)
+            if isSourceFile(relfn):
+                yield relfn
+
+class ToDoList:
+    def __init__(self, topDir, excludes):
+        self.__pending = []
+        self.__visited = {}
+        for f in sourceFiles(topDir, excludes):
+            self.__pending.append(f)
+        print "%d files to start with" % len(self.__pending)
+        
+    def count(self):
+        return len(self.__pending)
+    
+    def notDone(self):
+        return len(self.__pending) > 0
+    
+    def next(self):
+        if self.count() > 0:
+            f = self.__pending.pop()
+            self.__visited[f] = True
+            return f
+        return None
+
+    def add(self, f):
+        if self.__visited.get(f,False):
+            return
+        self.__pending.append(f)
+
+if __name__ == "__main__":
+    (options, args) = parser.parse_args()
+    topDir = "."
+    graph = Graph(topDir)
+    project = options.project
+    includes = options.includes
+    excludes = options.excludes
+    reInclude1 = re.compile(r'^[ \t]*#include <(.*)>')
+    reInclude2 = re.compile(r'^[ \t]*#include "(.*)"')
+    toDoList = ToDoList(topDir, excludes)
+    while toDoList.notDone():
+        n = toDoList.next()
+        print "Analyzing",n
+        f = file(n)
+        fromNode = Node(n)
+        graph.addNode(fromNode)
+        for line in f.readlines():
+            inc = reInclude2.search(line) or reInclude1.search(line) 
+            if inc:
+                relfn = inc.group(1)
+                resfn = resolve(includes,relfn,project)
+                fn = resfn or relfn
+                toNode = Node(fn)
+                edge = Edge(fromNode,toNode)
+                graph.addEdge(edge)
+                print "\tIncluding", fn
+                toDoList.add(resfn)
+    print "Graph has %d nodes and %d edges" % (len(graph.nodes()), len(graph.edges()))
