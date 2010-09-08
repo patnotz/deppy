@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 import os
-import glob
 import fnmatch
 import re
+import sys
 from optparse import OptionParser
 
 defaultExcludes = ['.git', 'TPLs_src']
@@ -146,6 +146,8 @@ class ToDoList:
             return
         self.__pending.append(f)
 
+log = sys.stderr
+
 if __name__ == "__main__":
     (options, args) = parser.parse_args()
     topDir = "."
@@ -158,7 +160,7 @@ if __name__ == "__main__":
     toDoList = ToDoList(topDir, excludes)
     while toDoList.notDone():
         n = toDoList.next()
-        print "Analyzing",n
+        log.write("Analyzing %s: " % n)
         f = file(n)
         fromNode = Node(n)
         fromNode.setProperty('resolved',True)
@@ -172,7 +174,8 @@ if __name__ == "__main__":
                 toNode.setProperty('resolved',found)
                 edge = Edge(fromNode,toNode)
                 graph.addEdge(edge)
-                print "\tIncluding", fn
+                log.write(".")
                 if found: 
                     toDoList.add(fn)
+        log.write("\n")
     print "Graph has %d nodes and %d edges" % (len(graph.nodes()), len(graph.edges()))
