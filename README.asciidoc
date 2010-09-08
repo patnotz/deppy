@@ -1,4 +1,7 @@
-This is a sample AsciiDoc Readme file
--------------------------------------
+The +deppy+ Analysis Tool
+-------------------------
 
-CAUTION: Work in Progress!
+Example +deppy+ usage:
+
+  ~/workspace/deppy/deppy -I/Users/pknotz/workspace/code/aria/include -I/Users/pknotz/workspace/code/aria/utest -I /Users/pknotz/workspace/code/framework/include -I/Users/pknotz/workspace/code/krino/include/ -I/Users/pknotz/workspace/code/equationsolver/include
+
