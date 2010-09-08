@@ -10,9 +10,9 @@ TODO List
 * Show full list of includes for a given file as a flat list
 * Show full list of includes for a given file as a hierarchy
 * Figure out which files are most included
-* GraphViz output for a given file
+* http://www.graphviz.org/Documentation.php[GraphViz] output for a given file
 * Persist dependency graph to disk
-* Use argparse inplace of optparse
+* Use http://docs.python.org/library/argparse.html[argparse] inplace of http://docs.python.org/library/optparse.html[optparse]
 
 .BTW
 http://powerman.name/doc/asciidoc[AsciiDoc Cheatsheat]
