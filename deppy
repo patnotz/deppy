@@ -25,32 +25,10 @@ parser.add_option("-x", "--exclude", dest="excludes",
 parser.add_option("-c", "--stdout", dest="stdout",
                   action="store_true",help="Write output to stdout instead of the new source file")
 
-class Node:
-    def __init__(self,name):
+class Entity:
+    def __init__(self, name):
         self.__name = name
-        self.__outEdges = {}
-        self.__inEdges = {}
-
-    def name(self):
-        return self.__name
-
-    def __str__(self):
-        return self.name()
-
-    def __repr__(self):
-        return self.name()
-
-    def outEdges(self):
-        return self.__outEdges
-
-    def inEdges(self):
-        return self.inEdges
-
-class Edge:
-    def __init__(self,fromNode,toNode):
-        self.__fromNode = fromNode
-        self.__toNode = toNode
-        self.__name = "%s -> %s" % (self.__fromNode, self.__toNode)
+        self.__props = {}
         
     def name(self):
         return self.__name
@@ -61,26 +39,42 @@ class Edge:
     def __repr__(self):
         return self.name()
 
+    def setProperty(self, key, value):
+        self.__props[key] = value
+
+    def getProperty(self, key, default=None):
+        return self.__props.get(key, default)
+
+class Node(Entity):
+    def __init__(self,name):
+        Entity.__init__(self,name)
+        self.__outEdges = {}
+        self.__inEdges = {}
+
+    def outEdges(self):
+        return self.__outEdges
+
+    def inEdges(self):
+        return self.inEdges
+
+class Edge(Entity):
+    def __init__(self,fromNode,toNode):
+        self.__fromNode = fromNode
+        self.__toNode = toNode
+        name = "%s -> %s" % (self.__fromNode, self.__toNode)
+        Entity.__init__(self,name)
+        
     def fromNode(self):
         return self.__fromNode
 
     def toNode(self):
         return self.__toNode;
 
-class Graph:
+class Graph(Entity):
     def __init__(self,name):
-        self.__name = name
+        Entity.__init__(self,name)
         self.__nodes = {}
         self.__edges = {}
-
-    def name(self):
-        return self.__name
-
-    def __str__(self):
-        return self.name()
-
-    def __repr__(self):
-        return self.name()
 
     def addNode(self, node):
         self.__nodes[node.name()] = node
@@ -96,23 +90,16 @@ class Graph:
     def nodes(self):
         return self.__nodes.values()
         
-def resolve(paths, filename, relpath):
-    for path in paths:
-        absfn = os.path.join(path,filename)
+def resolve(project, relpaths, incfn):
+    for relpath in relpaths:
+        projfn = os.path.join(relpath, incfn)
+        absfn  = os.path.join(project, projfn)
         if os.path.exists(absfn):
-            print "absfn",absfn
-            #return os.path.relpath(absfn, relpath)
-            return absfn
-    return None
+            return (True, absfn)
+    return (False, incfn)
 
 def isSourceFile(f):
     for pattern in ["*.C", "*.c", "*.c++", "*.cpp", "*.f", "*.F"]:
-        if fnmatch.fnmatchcase(f,pattern):
-            return True
-    return False
-
-def isHeaderFile(f):
-    for pattern in ["*.h", "*.H", "*.h++", "*.hpp"]:
         if fnmatch.fnmatchcase(f,pattern):
             return True
     return False
@@ -174,16 +161,18 @@ if __name__ == "__main__":
         print "Analyzing",n
         f = file(n)
         fromNode = Node(n)
+        fromNode.setProperty('resolved',True)
         graph.addNode(fromNode)
         for line in f.readlines():
             inc = reInclude2.search(line) or reInclude1.search(line) 
             if inc:
-                relfn = inc.group(1)
-                resfn = resolve(includes,relfn,project)
-                fn = resfn or relfn
+                incfn = inc.group(1)
+                (found, fn) = resolve(project, includes, incfn)
                 toNode = Node(fn)
+                toNode.setProperty('resolved',found)
                 edge = Edge(fromNode,toNode)
                 graph.addEdge(edge)
                 print "\tIncluding", fn
-                toDoList.add(resfn)
+                if found: 
+                    toDoList.add(fn)
     print "Graph has %d nodes and %d edges" % (len(graph.nodes()), len(graph.edges()))
